@@ -18,6 +18,8 @@ contract TestSalePlace {
 
     salePlace.addItem(name, image, description, price, numberOfItems);
 
+
+
     // Assert.equal(salePlace.items[0].name, name, "It should store the name of the item.");
     // Assert.equal(salePlace.items[0].image, image, "It should store the image name of the item.");
     // Assert.equal(salePlace.items[0].description, description, "It should store the description of the item.");

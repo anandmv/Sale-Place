@@ -87,7 +87,7 @@ contract("SalePlace", accounts => {
     var aliceBalanceAfter = await web3.eth.getBalance(alice)
     var bobBalanceAfter = await web3.eth.getBalance(bob)
 
-    const result = await instance.getItemSold(0,{from: bob})
+    const result = await instance.getItemPurcahsed(0,{from: bob})
 
     assert.equal(result[1], 1, 'number of items sold should be 1')
     assert.equal(result[2].toString(10), 0, 'the state of the item sold should be "Processing", which should be declared first in the State Enum')
@@ -125,7 +125,7 @@ contract("SalePlace", accounts => {
     await instance.buyItem(0, 1, {from: bob, value: excessAmount})
     await instance.shipItem(0,bob, {from: alice})
 
-    const result = await instance.getItemSold(0, {from: bob})
+    const result = await instance.getItemPurcahsed(0, {from: bob})
 
     assert.equal(result[2].toString(10), 1, 'the state of the item should be "Shipped", which should be declared third in the State Enum')
   })
@@ -150,7 +150,7 @@ contract("SalePlace", accounts => {
     await instance.shipItem(0,bob, {from: alice})
     await instance.receiveItem(0, {from: bob})
 
-    const result = await instance.getItemSold(0, {from: bob})
+    const result = await instance.getItemPurcahsed(0, {from: bob})
 
     assert.equal(result[2].toString(10), 2, 'the state of the item should be "Received", which should be declared fourth in the State Enum')
   })
@@ -192,7 +192,7 @@ contract("SalePlace", accounts => {
     var aliceBalanceAfter = await web3.eth.getBalance(alice)
     var bobBalanceAfter = await web3.eth.getBalance(bob)
 
-    const result = await instance.getItemSold(0, {from: bob})
+    const result = await instance.getItemPurcahsed(0, {from: bob})
 
     assert.equal(result[2].toString(10), 3, 'the state of the item should be "Refunded", which should be declared fourth in the State Enum')
 
