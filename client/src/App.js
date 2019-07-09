@@ -1,11 +1,12 @@
 import React, { Component } from "react";
 import SimpleStorageContract from "./contracts/SimpleStorage.json";
 import getWeb3 from "./utils/getWeb3";
+import { Loader } from 'rimble-ui';
 
 import "./App.css";
 
 class App extends Component {
-  state = { storageValue: 0, web3: null, accounts: null, contract: null };
+  state = { storageValue: 0, web3: null, accounts: null, contract: null , items: null};
 
   componentDidMount = async () => {
     try {
@@ -39,7 +40,7 @@ class App extends Component {
     const { accounts, contract } = this.state;
 
     // Stores a given value, 5 by default.
-    await contract.methods.set(5).send({ from: accounts[0] });
+    // await contract.methods.set(5).send({ from: accounts[0] });
 
     // Get the value from the contract to prove it worked.
     const response = await contract.methods.get().call();
@@ -50,7 +51,7 @@ class App extends Component {
 
   render() {
     if (!this.state.web3) {
-      return <div>Loading Web3, accounts, and contract...</div>;
+      return <Loader/>;
     }
     return (
       <div className="App">
