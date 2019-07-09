@@ -59,10 +59,11 @@ contract SalePlace {
   }
 
   event LogAddItem(address seller, uint itemId , uint numberOfItems, uint price);
+  event LogUpdateItem(address seller, uint itemId , uint numberOfItems, uint price);
   event LogBuyItem(address buyer, uint itemId , uint numberOfItems);
-  event LogItemShipped(address seller, uint itemId);
-  event LogItemReceived(address buyer, uint itemId);
-  event LogItemRefund(address seller, address buyer, uint itemId, uint amountRefunded);
+  event LogShipped(address seller, uint itemId);
+  event LogReceived(address buyer, uint itemId);
+  event LogRefund(address seller, address buyer, uint itemId, uint amountRefunded);
 
   function getItem(uint _itemId) 
   public 
@@ -94,7 +95,7 @@ contract SalePlace {
   view
   returns(uint){
     uint itemIndex;
-    for( uint index = 0 ; index < itemId; index++){
+    for( uint index = 0 ; index < itemsSold[_itemId].length; index++){
         if(itemsSold[_itemId][index].buyer == _buyer){
             itemIndex = index;
         }
@@ -120,6 +121,21 @@ contract SalePlace {
     return true;
   }
 
+  function updateItem(uint _itemId, string memory _name, string memory _image, string memory _description, uint _price, uint _numberOfItems)
+  public
+  isSeller(_itemId)
+  returns(bool){
+    require(_numberOfItems>0 , 'Number of items should be atleast 1');
+    require(_price>0 , 'Price of items cannot be atleast 0');
+    items[_itemId].name = _name;
+    items[_itemId].image = _image;
+    items[_itemId].description = _description;
+    items[_itemId].price = _price;
+    items[_itemId].numberOfItems = _numberOfItems;
+    emit LogUpdateItem(msg.sender, _itemId, _numberOfItems, _price);
+    return true;
+  }
+
   function buyItem(uint _itemId, uint _numberOfItems) 
   public 
   payable
@@ -131,8 +147,7 @@ contract SalePlace {
     newItemSold.status = Status.Processing;
     newItemSold.numberOfItemsSold = _numberOfItems;
     newItemSold.buyer = msg.sender;
-    uint newItemsSoldIndex = itemsSold[_itemId].length+1;
-    itemsSold[_itemId][newItemsSoldIndex] = newItemSold;
+    itemsSold[_itemId].push(newItemSold);
 
     emit LogBuyItem(msg.sender, _itemId , _numberOfItems);
 
@@ -146,7 +161,7 @@ contract SalePlace {
     uint itemIndex = getItemSoldIndex(_itemId, _buyer);
     require(itemsSold[_itemId][itemIndex].status == Status.Processing , 'Item already shipped');
     itemsSold[_itemId][itemIndex].status = Status.Shipped;
-    emit LogItemShipped(msg.sender, _itemId);
+    emit LogShipped(msg.sender, _itemId);
     return true;
   }
 
@@ -157,26 +172,27 @@ contract SalePlace {
     uint itemIndex = getItemSoldIndex(_itemId, msg.sender);
     require(itemsSold[_itemId][itemIndex].status == Status.Shipped , 'Item not yet shipped');
     itemsSold[_itemId][itemIndex].status = Status.Received;
-    emit LogItemReceived(msg.sender, _itemId);
+    emit LogReceived(msg.sender, _itemId);
     return true;
   }
 
-  function refundItem(uint _itemId)
+  function refundItem(uint _itemId, address _buyer)
   public 
   payable
   isSeller(_itemId)
   returns(bool){
-    uint itemIndex = getItemSoldIndex(_itemId, msg.sender);
+    uint itemIndex = getItemSoldIndex(_itemId, _buyer);
     uint totalAmount = itemsSold[_itemId][itemIndex].numberOfItemsSold * items[_itemId].price;
     require(msg.value >= totalAmount , 'Amount less than required');
-
+    
     itemsSold[_itemId][itemIndex].buyer.transfer(totalAmount); // transfer to buyer
 
     uint amountLeftOver = msg.value - items[_itemId].price;
     if(amountLeftOver>0){
       items[_itemId].seller.transfer(amountLeftOver); // transfer any left over to seller
     }
-    emit LogItemRefund(msg.sender, itemsSold[_itemId][itemIndex].buyer, _itemId, totalAmount);
+    itemsSold[_itemId][itemIndex].status = Status.Refunded;
+    emit LogRefund(msg.sender, itemsSold[_itemId][itemIndex].buyer, _itemId, totalAmount);
     return true;
   }
 }
