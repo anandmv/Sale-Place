@@ -41,8 +41,8 @@ const web3Instance = new Web3Instance();
 
 const getInstance = async () =>{
     try {
-        const web3 = await getWeb3();
         if(!web3Instance.web3){
+          const web3 = await getWeb3();
           await web3Instance.setWeb3(web3);
         }
         if(!web3Instance.getInstance('SalePlace')){

@@ -7,13 +7,13 @@ class ItemPurcahsed extends Component {
   state = { items: false};
 
   componentDidMount = async () => {
-    const { instance } = await getInstance();
-    await this.getItems(instance);
+    const { accounts, instance } = await getInstance();
+    await this.getItems(accounts[0],instance);
   };
 
-  getItems = async (instance) => {
-    const totalItems = await instance.methods.getItemsPurcahsed().call();
-    console.log("Total Items ,", totalItems);
+  getItems = async (account, instance) => {
+    const totalItems = await instance.methods.getItemsPurcahsed().call({ from: account });
+    console.log("Total Items Purcahsed,", totalItems);
     const items = [];
     for(let index = 0; index< totalItems.length; index++){
       const item = await instance.methods.getItem(totalItems[index]).call();
