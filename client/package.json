@@ -5,6 +5,7 @@
   "dependencies": {
     "react": "^16.6.3",
     "react-dom": "^16.6.3",
+    "react-router-dom": "^5.0.1",
     "react-scripts": "2.1.1",
     "rimble-ui": "^0.9.4",
     "styled-components": "^4.3.2",
@@ -24,5 +25,41 @@
     "not dead",
     "not ie <= 11",
     "not op_mini all"
-  ]
+  ],
+  "jest": {
+    "coverageThreshold": {
+      "src/": {
+        "branches": 0.4,
+        "lines": 10,
+        "statements": 2
+      },
+      "src/components/": {
+        "branches": 2,
+        "lines": 14,
+        "statements": 13
+      },
+      "src/pages/": {
+        "branches": 0.1,
+        "lines": 1,
+        "statements": 0.1
+      },
+      "src/utils/": {
+        "branches": 0.9,
+        "functions": 3,
+        "lines": 8,
+        "statements": 7
+      }
+    }
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "git add"
+    ]
+  }
 }

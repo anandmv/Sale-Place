@@ -33,7 +33,8 @@ contract SalePlace {
   }
 
   mapping (uint => Item) public items;
-  mapping (uint => ItemSold[] ) itemsSold;
+  mapping (address => uint[]) private itemsPurcahsed;
+  mapping (uint => ItemSold[]) private itemsSold;
 
   constructor() public{
     itemId = 0;
@@ -79,11 +80,27 @@ contract SalePlace {
   event LogReceived(address buyer, uint itemId);
   event LogRefund(address seller, address buyer, uint itemId, uint amountRefunded);
 
+  /// @notice Get items size of the mapping
+  /// @return total items present
+  function getItemsSize()
+  public
+  view returns (uint) {
+    return itemId;
+  }
+
+  /// @notice Get list of item id's purcahsed by user
+  /// @return array of itemIds
+  function getItemsPurcahsed()
+  public
+  view returns (uint[] memory) {
+    return itemsPurcahsed[msg.sender];
+  }
+
   /// @notice Get am item based on item id
-  /// @param _itemId id of the item to fetch 
+  /// @param _itemId id of the item to fetch
   /// @return name, image , description , price , number of Items left and seller address of the item
-  function getItem(uint _itemId) 
-  public 
+  function getItem(uint _itemId)
+  public
   view returns (string memory name, string memory image, string memory description, uint price, uint numberOfItems, address seller) {
     name = items[_itemId].name;
     image = items[_itemId].image;
@@ -202,6 +219,8 @@ contract SalePlace {
     itemsSold[_itemId].push(newItemSold);
 
     items[_itemId].numberOfItems = items[_itemId].numberOfItems - 1;
+
+    itemsPurcahsed[msg.sender].push(_itemId);
 
     emit LogBuyItem(msg.sender, _itemId , _numberOfItems);
 
