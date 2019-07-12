@@ -23,12 +23,14 @@ contract SalePlace {
     string description;
     uint price;
     uint numberOfItems;
+    uint timestamp;
     address payable seller;
   }
 
   struct ItemSold{
     uint numberOfItemsSold;
     Status status;
+    uint timestamp;
     address payable buyer;
   }
 
@@ -48,7 +50,7 @@ contract SalePlace {
   modifier isBuyer(uint _itemId){
     _;
     bool havePurchase = false;
-    for( uint index = 0 ; index < itemId; index++){
+    for( uint index = 0 ; index < itemsSold[_itemId].length; index++){
         if(itemsSold[_itemId][index].buyer == msg.sender){
             havePurchase = true;
         }
@@ -87,64 +89,95 @@ contract SalePlace {
   view returns (uint) {
     return itemId;
   }
+  
+  /// @notice Get itemsSold size of the mapping
+  /// @return total itemsSold present
+  function getItemsSoldSize(uint _itemId)
+  public
+  view returns (uint) {
+    return  itemsSold[_itemId].length;
+  }
+
+  /// @notice Get itemsSold index of the purchasedItem
+  /// @return array of indexs
+  function getItemPurchasedSize(uint _itemId)
+  public
+  isBuyer(_itemId)
+  view returns (uint[] memory purcahseIndex) {
+    uint pushIndex;
+    for( uint index = 0 ; index < itemsSold[_itemId].length; index++){
+        if(itemsSold[_itemId][index].buyer == msg.sender){
+            purcahseIndex[pushIndex] = index;
+            pushIndex++;
+        }
+    }
+    return purcahseIndex;
+  }
 
   /// @notice Get list of item id's purcahsed by user
   /// @return array of itemIds
-  function getItemsPurcahsed()
+  function getItemsPurchased()
   public
   view returns (uint[] memory) {
     return itemsPurcahsed[msg.sender];
   }
 
+  /// @notice Get list of item status and buyer address sold for the respective item
+  /// @return array of itemIds
+  function getItemSold(uint _itemId, uint _index)
+  public
+  isSeller(_itemId)
+  view returns (uint numberOfItems,Status status, uint timestamp, address buyer){
+    require(itemsSold[_itemId][_index].buyer!= address(0) , "No item to display");
+    numberOfItems = itemsSold[_itemId][_index].numberOfItemsSold;
+    status = itemsSold[_itemId][_index].status;
+    timestamp = itemsSold[_itemId][_index].timestamp;
+    buyer = itemsSold[_itemId][_index].buyer;
+    return (numberOfItems,status, timestamp, buyer);
+  }
+
   /// @notice Get am item based on item id
   /// @param _itemId id of the item to fetch
-  /// @return name, image , description , price , number of Items left and seller address of the item
+  /// @return id, name, image , description , price , number of Items left, timestamp and seller address of the item
   function getItem(uint _itemId)
   public
-  view returns (string memory name, string memory image, string memory description, uint price, uint numberOfItems, address seller) {
+  view returns (uint id, string memory name, string memory image, string memory description, uint price, uint numberOfItems, address seller, uint timestamp) {
+    id = _itemId;
     name = items[_itemId].name;
     image = items[_itemId].image;
     price = items[_itemId].price;
     description = items[_itemId].description;
     numberOfItems = items[_itemId].numberOfItems;
     seller = items[_itemId].seller;
-    return (name, image, description, price, numberOfItems, seller);
+    timestamp = items[_itemId].timestamp;
+    return (id, name, image, description, price, numberOfItems, seller, timestamp);
   }
 
   /// @notice Get item purcahsed details of the request user mapping for given item
   /// @param _itemId id of the item to fetch 
-  /// @return itemId, number of Items sold , status and buyer address
-  function getItemPurcahsed(uint _itemId) 
+  /// @param _index index of the purcahse item to fetch 
+  /// @return itemId, number of Items sold , status,timestamp and buyer address
+  function getItemPurchased(uint _itemId, uint _index)
   public 
   view 
-  returns (uint , uint , Status, address) {
-    ItemSold memory itemSold;
-    for( uint index = 0 ; index < itemId; index++){
-        if(itemsSold[_itemId][index].buyer == msg.sender){
-            itemSold = itemsSold[_itemId][index];
-        }
-    }
-    return (_itemId, itemSold.numberOfItemsSold, itemSold.status, itemSold.buyer);
+  isBuyer(_itemId)
+  returns (uint , uint, uint , Status, address, uint) {
+    ItemSold memory itemSold = itemsSold[_itemId][_index];
+    return (_itemId, _index, itemSold.numberOfItemsSold, itemSold.status, itemSold.buyer, itemSold.timestamp);
   }
   
   /// @notice Get item sold array index for a given item id and buyer address
   /// @param _itemId id of the item to fetch 
   /// @param _buyer address of the buyer 
   /// @return itemId, number of Items sold , status and buyer address
-  function getItemSoldIndex(uint _itemId, address _buyer)
+  function getItemSoldIndex(uint _itemId, address _buyer, uint _itemSoldIndex)
   private
   view
   returns(uint){
-    uint itemIndex;
-    bool isFound = false;
-    for( uint index = 0 ; index < itemsSold[_itemId].length; index++){
-        if(itemsSold[_itemId][index].buyer == _buyer){
-            itemIndex = index;
-            isFound = true;
-        }
-    }
-    require(isFound == true, 'Item sold not found for given buyer address');
-    return itemIndex;
+    require(itemsSold[_itemId][_itemSoldIndex].buyer != address(0), 'Item sold not found');
+
+    require(itemsSold[_itemId][_itemSoldIndex].buyer == _buyer, 'Not owner of the record');    
+    return _itemSoldIndex;
   }
 
   /// @notice Add item 
@@ -167,6 +200,7 @@ contract SalePlace {
     newItem.price = _price;
     newItem.numberOfItems = _numberOfItems;
     newItem.seller = msg.sender;
+    newItem.timestamp = now;
     items[itemId] = newItem;
     emit LogAddItem(msg.sender, itemId, _numberOfItems, _price);
     itemId++;
@@ -216,6 +250,7 @@ contract SalePlace {
     newItemSold.status = Status.Processing;
     newItemSold.numberOfItemsSold = _numberOfItems;
     newItemSold.buyer = msg.sender;
+    newItemSold.timestamp = now;
     itemsSold[_itemId].push(newItemSold);
 
     items[_itemId].numberOfItems = items[_itemId].numberOfItems - 1;
@@ -233,11 +268,11 @@ contract SalePlace {
   /// @param _itemId id of the item
   /// @param _buyer address of buyer
   /// @return true if items is udpated to shipped status
-  function shipItem(uint _itemId, address _buyer)
+  function shipItem(uint _itemId, address _buyer, uint _itemSoldIndex)
   public
   isSeller(_itemId)
   returns(bool){
-    uint itemIndex = getItemSoldIndex(_itemId, _buyer);
+    uint itemIndex = getItemSoldIndex(_itemId, _buyer, _itemSoldIndex);
     require(itemsSold[_itemId][itemIndex].status == Status.Processing , 'Item already shipped');
     itemsSold[_itemId][itemIndex].status = Status.Shipped;
     emit LogShipped(msg.sender, _itemId);
@@ -249,11 +284,11 @@ contract SalePlace {
   /// @dev Needs to be buyer of the item to access the function
   /// @param _itemId id of the item
   /// @return true if items is udpated to received status
-  function receiveItem(uint _itemId)
+  function receiveItem(uint _itemId, uint _itemSoldIndex)
   public
   isBuyer(_itemId)
   returns(bool){
-    uint itemIndex = getItemSoldIndex(_itemId, msg.sender);
+    uint itemIndex = getItemSoldIndex(_itemId, msg.sender, _itemSoldIndex);
     require(itemsSold[_itemId][itemIndex].status == Status.Shipped , 'Item not yet shipped');
     itemsSold[_itemId][itemIndex].status = Status.Received;
     emit LogReceived(msg.sender, _itemId);
@@ -267,12 +302,12 @@ contract SalePlace {
   /// @param _itemId id of the item
   /// @param _buyer address of buyer
   /// @return true if refund is successfull
-  function refundItem(uint _itemId, address _buyer)
+  function refundItem(uint _itemId, address _buyer, uint _itemSoldIndex)
   public 
   payable
   isSeller(_itemId)
   returns(bool){
-    uint itemIndex = getItemSoldIndex(_itemId, _buyer);
+    uint itemIndex = getItemSoldIndex(_itemId, _buyer,_itemSoldIndex);
     uint totalAmount = itemsSold[_itemId][itemIndex].numberOfItemsSold * items[_itemId].price;
     require(msg.value >= totalAmount , 'Amount less than required');
     

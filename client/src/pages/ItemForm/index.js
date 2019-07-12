@@ -1,14 +1,16 @@
 import React , { Component } from 'react';
 import { Button, Card, Form, Heading } from 'rimble-ui';
 import getInstance from '../../utils/getInstance';
+import Web3  from 'web3';
 
 class CreateItem extends Component {
-  state = { submitting:false };
+  state = { submitting:false, name:'', image:'', description:'', price:'', numberOfItems:'', id:'', isEdit:false };
 
   componentDidMount = async () => {
     try {
       const {accounts, instance} = await getInstance();
-      this.setState({ accounts, instance });
+      let isEdit = !!this.props.match.params.id;
+      this.setState({ accounts, instance, isEdit }, this.getItem);
     } catch (error) {
       alert(
         `Failed to load contract. Check console for details.`,
@@ -16,12 +18,29 @@ class CreateItem extends Component {
     }
   };
 
+  getItem = async () => {
+    if(this.state.isEdit){
+      const item = await this.state.instance.methods.getItem(this.props.match.params.id).call();
+      item.id = this.props.match.params.id;
+      this.setState({ ...item });
+    }
+  };
+
   addItem = async() =>{
-    const { name , description , image, price , numberOfItems, instance, accounts } = this.state;
-    console.log("calling addItem, params: " , name , description , image, price , numberOfItems ,accounts[0])
-    const response = await instance.methods.addItem(name , image, description, price, numberOfItems ).send({ from: accounts[0] });
-    if(response.status){
-        alert(`${name} created!`)
+    const { id, name , description , image, price , numberOfItems, instance, accounts, isEdit } = this.state;
+    const priceInEth = Web3.utils.toWei(price, 'ether')
+    if(isEdit){
+      console.log("calling updateItem, params: " , id, name , description , image, priceInEth , numberOfItems ,accounts[0])
+      const response = await instance.methods.updateItem(id, name , image, description, priceInEth, numberOfItems ).send({ from: accounts[0] });
+      if(response.status){
+          alert(`${name} udpated!`)
+      }
+    }else{
+      console.log("calling addItem, params: " , name , description , image, priceInEth , numberOfItems ,accounts[0])
+      const response = await instance.methods.addItem(name , image, description, priceInEth, numberOfItems ).send({ from: accounts[0] });
+      if(response.status){
+          alert(`${name} created!`)
+      }
     }
   }
 
@@ -39,7 +58,7 @@ class CreateItem extends Component {
 
   render() {
     return (<Card>
-        <Heading.h2> Create Item </Heading.h2>
+        <Heading.h2> {this.state.isEdit ? 'Update': 'Create'} Item </Heading.h2>
         <Form onSubmit={this.handleSubmit}>
             <Form.Field label="Name" width={1}>
             <Form.Input
@@ -48,6 +67,7 @@ class CreateItem extends Component {
                 required
                 width={1}
                 onChange={this.handleValueChange}
+                value={this.state.name}
             />
             </Form.Field>
             <Form.Field label="Description" width={1}>
@@ -56,6 +76,7 @@ class CreateItem extends Component {
                 name="description"
                 width={1}
                 onChange={this.handleValueChange}
+                value={this.state.description}
             />
             </Form.Field>
             <Form.Field label="Image Url" width={1}>
@@ -65,6 +86,7 @@ class CreateItem extends Component {
                 required
                 width={1}
                 onChange={this.handleValueChange}
+                value={this.state.image}
             />
             </Form.Field>
             <Form.Field label="Price per Item" width={1}>
@@ -75,6 +97,7 @@ class CreateItem extends Component {
                 width={1}
                 onChange={this.handleValueChange}
                 min="0"
+                value={this.state.price}
             />
             </Form.Field>
             <Form.Field label="Number of units" width={1}>
@@ -85,9 +108,10 @@ class CreateItem extends Component {
                 width={1}
                 onChange={this.handleValueChange}
                 min="1"
+                value={this.state.numberOfItems}
             />
             </Form.Field>
-            <Button type="submit" width={1} disabled={this.state.submitting}>Create</Button>
+            <Button type="submit" width={1} disabled={this.state.submitting}>{this.state.isEdit ? 'Update': 'Create'}</Button>
         </Form>
       </Card>
     );

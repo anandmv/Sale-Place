@@ -12,21 +12,27 @@ class ItemPurcahsed extends Component {
   };
 
   getItems = async (account, instance) => {
-    const totalItems = await instance.methods.getItemsPurcahsed().call({ from: account });
+    const totalItems = await instance.methods.getItemsPurchased().call({ from: account });
     console.log("Total Items Purcahsed,", totalItems);
-    const items = [];
+    const items = [], itemIds = [];
     for(let index = 0; index< totalItems.length; index++){
-      const item = await instance.methods.getItem(totalItems[index]).call();
-      items.push({...item, id:index});
+      if(itemIds.indexOf(totalItems[index]) === -1){
+        const item = await instance.methods.getItem(totalItems[index]).call();
+        itemIds.push(totalItems[index]);
+        items.push(item);
+      }
     }
     console.log(items)
-    this.setState({ items });
+    this.setState({ items, totalItems });
   };
 
   render() {
     const { items } = this.state;
     if(items === false){
       return <Loader size="100px"/>
+    }
+    else if(items && items.length === 0){
+      return "No items purcahsed yet!"
     }
     return <Flex>
       {items.map((item,index)=>

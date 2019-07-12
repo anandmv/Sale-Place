@@ -4,7 +4,7 @@ import getInstance from '../../utils/getInstance';
 import { ItemCard } from '../../components'
 
 class ItemList extends Component {
-  state = { items: []};
+  state = { items: [] , totalItems: false };
 
   componentDidMount = async () => {
     const { instance } = await getInstance();
@@ -17,14 +17,17 @@ class ItemList extends Component {
     const items = [];
     for(let index = 0; index< totalItems; index++){
       const item = await instance.methods.getItem(index).call();
-      items.push({...item, id:index});
+      items.push(item);
     }
     console.log(items)
-    this.setState({ items });
+    this.setState({ items, totalItems});
   };
 
   render() {
-    const { items } = this.state;
+    const { items, totalItems } = this.state;
+    if(parseInt(totalItems) === 0 ){
+      return "No Items to display"
+    }
     if(!items || items.length === 0){
       return <Loader size="100px"/>
     }
