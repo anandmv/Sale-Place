@@ -102,10 +102,10 @@ contract SalePlace {
   /// @return array of indexs
   function getItemPurchasedSize(uint _itemId)
   public
-  isBuyer(_itemId)
-  view returns (uint[] memory purcahseIndex) {
-    uint pushIndex;
-    for( uint index = 0 ; index < itemsSold[_itemId].length; index++){
+  view returns (uint[] memory) {
+    uint pushIndex = 0;
+    uint[] memory purcahseIndex = new uint[](10);
+    for( uint index = 0 ; index < itemsSold[_itemId].length && pushIndex < 10; index++){
         if(itemsSold[_itemId][index].buyer == msg.sender){
             purcahseIndex[pushIndex] = index;
             pushIndex++;

@@ -23,17 +23,19 @@ class ItemList extends Component {
 
   getItemPurchased = async () => {
     const itemId = this.props.match.params.id;
-    const totalItemsPurcahsed= await this.state.instance.methods.getItemPurchasedSize(itemId).call();
+    const itemsPurcahsedTop10 = await this.state.instance.methods.getItemPurchasedSize(itemId).call();
+    const totalItemsPurcahsed = Array.from(new Set(itemsPurcahsedTop10))
     console.log("Total Items purcahsed,", totalItemsPurcahsed);
     const itemsPurchased = [];
     for(let index = 0; index< totalItemsPurcahsed.length; index++){
       const itemPurchasedRaw = await this.state.instance.methods.getItemPurchased(itemId, totalItemsPurcahsed[index]).call();
       itemsPurchased.push({
         itemId: itemPurchasedRaw[0],
-        numberOfItemPurchased : itemPurchasedRaw[1],
-        status : status[parseInt(itemPurchasedRaw[2])],
-        buyer : itemPurchasedRaw[3],
-        timestamp: itemPurchasedRaw[4]
+        index: itemPurchasedRaw[1],
+        numberOfItemPurchased : itemPurchasedRaw[2],
+        status : parseInt(itemPurchasedRaw[3]),
+        buyer : itemPurchasedRaw[4],
+        timestamp: itemPurchasedRaw[5]
       });
     }
     console.log(itemsPurchased)
@@ -52,6 +54,7 @@ class ItemList extends Component {
     const itemsSold = [];
     for(let index = 0; index< totalItemsSold; index++){
       const item = await this.state.instance.methods.getItemSold(itemId, index).call();
+      item.index = index;
       itemsSold.push(item);
     }
     console.log(itemsSold)
@@ -76,7 +79,7 @@ class ItemList extends Component {
     }
   }
 
-  isActionOwner(address){
+  isActionOwner(address = ''){
     return address.toString() === this.state.accounts[0].toString() 
   }
 
@@ -84,13 +87,13 @@ class ItemList extends Component {
     const {accounts, instance, item} = this.state;
     let response;
     if(currentStatus === "Processing"){
-      response = await instance.methods.shipItem(item.id, buyer).send({ from: accounts[0] });
+      response = await instance.methods.shipItem(item.id, buyer, index).send({ from: accounts[0] });
     }
     else if(currentStatus === "Shipped"){
-      response = await instance.methods.receiveItem(item.id).send({ from: accounts[0] });
+      response = await instance.methods.receiveItem(item.id, index).send({ from: accounts[0] });
     }
     else if(currentStatus === "Received"){
-      response = await instance.methods.refundItem(item.id, buyer).send({ from: accounts[0], value: item.price});
+      response = await instance.methods.refundItem(item.id, buyer, index).send({ from: accounts[0], value: item.price});
     }
     if(response.status){
       this.getItemPurchased();
@@ -138,7 +141,7 @@ class ItemList extends Component {
         <Heading.h6>Status: {status[itemPurchased.status]}</Heading.h6>
         <Text>Number of Items purcahsed {itemPurchased.numberOfItemPurcahsed}</Text>
         <Text>You have purchased this item on {this.getDateTime(itemPurchased.timestamp)}</Text>
-        {itemPurchased.status === status[1] && this.isActionOwner(itemPurchased.pedbuyer) && <Button onClick = {()=>this.updateStatus(itemPurchased.status,'',index)}> Set as Received </Button>}
+        {itemPurchased.status === status[1] && this.isActionOwner(itemPurchased.buyer) && <Button onClick = {()=>this.updateStatus(itemPurchased.status,'',itemPurchased.index)}> Set as Received </Button>}
       </div>
       )}
     </Card>
@@ -154,9 +157,9 @@ class ItemList extends Component {
           <Text>Number of Items Sold : {itemSold.numberOfItems}</Text>
           <Text>User have purchased this item on {this.getDateTime(itemSold.timestamp)}</Text>
           <Text> Buyer <EthAddress address={itemSold.buyer} truncate/></Text>
-          {this.isActionOwner(item.seller) && parseInt(itemSold.status) === 0 && <Button onClick = {()=>this.updateStatus('Processing', itemSold.buyer,index)}> Set as Shipped </Button>}
+          {this.isActionOwner(item.seller) && parseInt(itemSold.status) === 0 && <Button onClick = {()=>this.updateStatus('Processing', itemSold.buyer, itemSold.index)}> Set as Shipped </Button>}
           <br/>
-          {this.isActionOwner(item.seller) && parseInt(itemSold.status) < 3 && <Button onClick = {()=>this.updateStatus('Received', itemSold.buyer, index)}> Refund </Button>}
+          {this.isActionOwner(item.seller) && parseInt(itemSold.status) < 3 && <Button onClick = {()=>this.updateStatus('Received', itemSold.buyer, itemSold.index)}> Refund </Button>}
         </div>
       )}
       
