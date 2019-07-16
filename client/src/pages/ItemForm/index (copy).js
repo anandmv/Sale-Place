@@ -1,58 +1,53 @@
 import React , { Component } from 'react';
-import { Button, Card, Form, Heading, Loader } from 'rimble-ui';
+import { Button, Card, Form, Heading } from 'rimble-ui';
 import getInstance from '../../utils/getInstance';
 import Web3  from 'web3';
-import { withFirestore } from 'react-firestore';
 
-class ItemForm extends Component {
-  state = {
-    item: null,
-    isEdit: false,
-    isLoading: true,
-    name:'', image:'', description:'', price:'', numberOfItems:'', priceInEth:''
-  };
+class CreateItem extends Component {
+  state = { submitting:false, name:'', image:'', description:'', price:'', numberOfItems:'', id:'', isEdit:false };
 
   componentDidMount = async () => {
-    const {accounts, instance} = await getInstance();
-    let isEdit = !!this.props.match.params.id;
-    this.setState({ accounts, instance, isEdit, isLoading: isEdit }, this.getItem);
-    console.log(this.props.firestore)
-  }
-
-  getItem(){
-    if(this.state.isEdit){
-      const { firestore } = this.props;
-      const itemId = this.props.match.params.id;
-      firestore.doc(`items/${itemId}`).onSnapshot(snapshot => {
-        const { name , description , image, priceInWei , numberOfItems} = snapshot.data();
-        const price = Web3.utils.fromWei(priceInWei, 'ether')
-        console.log(price, priceInWei)
-        this.setState({ name , description , image, price , numberOfItems, isLoading: false });
-      });
+    try {
+      const {accounts, instance} = await getInstance();
+      let isEdit = !!this.props.match.params.id;
+      this.setState({ accounts, instance, isEdit }, this.getItem);
+    } catch (error) {
+      alert(
+        `Failed to load contract. Check console for details.`,
+      );
     }
-  }
+  };
 
-  addUpdateItem = async ()=> {
-    const { name , description , image, price , numberOfItems, isEdit } = this.state;
-    const itemId = this.props.match.params.id;
-    const priceInWei = Web3.utils.toWei(price, 'ether')
-    if(!isEdit){
-      const collectionRef = this.props.firestore.collection('items');
-      const itemRef = await collectionRef.add({
-        name , image, description, priceInWei, numberOfItems
-      })
-      console.log(itemRef)
+  getItem = async () => {
+    if(this.state.isEdit){
+      const item = await this.state.instance.methods.getItem(this.props.match.params.id).call();
+      item.id = this.props.match.params.id;
+      this.setState({ ...item });
+    }
+  };
+
+  addItem = async() =>{
+    const { id, name , description , image, price , numberOfItems, instance, accounts, isEdit } = this.state;
+    const priceInEth = Web3.utils.toWei(price, 'ether')
+    if(isEdit){
+      console.log("calling updateItem, params: " , id, name , description , image, priceInEth , numberOfItems ,accounts[0])
+      const response = await instance.methods.updateItem(id, name , image, description, priceInEth, numberOfItems ).send({ from: accounts[0] });
+      if(response.status){
+          alert(`${name} udpated!`)
+      }
     }else{
-      const documentRef = this.props.firestore.doc(`items/${itemId}`);
-      await documentRef.update({name , image, description, priceInWei, numberOfItems })
+      console.log("calling addItem, params: " , name , description , image, priceInEth , numberOfItems ,accounts[0])
+      const response = await instance.methods.addItem(name , image, description, priceInEth, numberOfItems ).send({ from: accounts[0] });
+      if(response.status){
+          alert(`${name} created!`)
+      }
     }
   }
 
   handleSubmit = async (e) => {
     this.setState({submitting:true});
     e.preventDefault();
-    await this.addUpdateItem();
-    console.log(this.state.item)
+    await this.addItem();
     this.setState({submitting:false});
   };
 
@@ -62,12 +57,8 @@ class ItemForm extends Component {
   }
 
   render() {
-    const { isEdit, isLoading } = this.state;
-    if(isLoading){
-      return <Loader />
-    }
-    return  <Card>
-        <Heading.h2> {isEdit ? 'Update': 'Create'} Item </Heading.h2>
+    return (<Card>
+        <Heading.h2> {this.state.isEdit ? 'Update': 'Create'} Item </Heading.h2>
         <Form onSubmit={this.handleSubmit}>
             <Form.Field label="Name" width={1}>
             <Form.Input
@@ -98,7 +89,7 @@ class ItemForm extends Component {
                 value={this.state.image}
             />
             </Form.Field>
-            <Form.Field label="Price per Item(ETH)" width={1}>
+            <Form.Field label="Price per Item" width={1}>
             <Form.Input
                 type="number"
                 name="price"
@@ -120,10 +111,11 @@ class ItemForm extends Component {
                 value={this.state.numberOfItems}
             />
             </Form.Field>
-            <Button type="submit" width={1} disabled={this.state.submitting}>{isEdit ? 'Update': 'Create'}</Button>
+            <Button type="submit" width={1} disabled={this.state.submitting}>{this.state.isEdit ? 'Update': 'Create'}</Button>
         </Form>
       </Card>
+    );
   }
 }
 
-export default withFirestore(ItemForm);
+export default CreateItem;
