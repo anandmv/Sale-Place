@@ -1,6 +1,11 @@
 pragma solidity ^0.5.0;
 
+import "./SafeMath.sol";
+
 contract SalePlace {
+
+  using SafeMath for uint;
+
   struct Item {
     string name;
     string image;
@@ -54,10 +59,10 @@ contract SalePlace {
   /// @dev the function will trade amount from buyer to seller , also any left over amount will be transfered to buyer itself
   modifier trade (string memory _itemId, uint _numberOfItems)  {
     _;
-    uint totalAmount = _numberOfItems * items[_itemId].price;
+    uint totalAmount = _numberOfItems.mul(items[_itemId].price);
     require(msg.value >= totalAmount, 'Amount less than required');
 
-    uint amountToRefund = msg.value - items[_itemId].price;
+    uint amountToRefund = msg.value.sub(items[_itemId].price);
     if(amountToRefund>0){
       msg.sender.transfer(amountToRefund); // transfer left over to buyer
     }
@@ -174,7 +179,7 @@ contract SalePlace {
     newItemInvoice.buyer = msg.sender;
     newItemInvoice.timestamp = now;
     newItemInvoice.itemId = _itemId;
-    newItemInvoice.amountPaid = _numberOfItems * items[_itemId].price;
+    newItemInvoice.amountPaid = _numberOfItems.mul(items[_itemId].price);
     itemsSold[_invoiceId] = newItemInvoice;
 
     items[_itemId].numberOfItems = items[_itemId].numberOfItems - 1;
@@ -233,7 +238,7 @@ contract SalePlace {
 
     itemsSold[_invoiceId].buyer.transfer(itemsSold[_invoiceId].amountPaid); // transfer to buyer
 
-    uint amountLeftOver = msg.value - itemsSold[_invoiceId].amountPaid;
+    uint amountLeftOver = msg.value.sub(itemsSold[_invoiceId].amountPaid);
     
     if(amountLeftOver>0){
       items[itemId].seller.transfer(amountLeftOver); // transfer any left over to seller
