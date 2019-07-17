@@ -182,7 +182,7 @@ contract SalePlace {
     newItemInvoice.amountPaid = _numberOfItems.mul(items[_itemId].price);
     itemsSold[_invoiceId] = newItemInvoice;
 
-    items[_itemId].numberOfItems = items[_itemId].numberOfItems - 1;
+    items[_itemId].numberOfItems = items[_itemId].numberOfItems.sub(1);
 
     emit LogBuyItem(msg.sender, _itemId, _numberOfItems);
 
