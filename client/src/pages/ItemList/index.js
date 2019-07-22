@@ -1,26 +1,21 @@
 import React from "react";
-import { Loader, Flex, Box } from 'rimble-ui';
+import { Loader } from 'rimble-ui';
 import { ItemCard } from '../../components';
 import { FirestoreCollection } from 'react-firestore';
 
 const ItemList = ()=> <FirestoreCollection
   path="items"
+  filter={['status', '==', true]}
   render={({ isLoading, data }) => {
-    console.log(data)
-    return isLoading ? (
-      <Loader />
-    ) : (
-      <div>
+    if(isLoading){
+      return <Loader size="100px"/>
+    }
+    return <div>
         <h1>Items</h1>
-        <Flex>
-          {data.map((item,index)=>
-            <Box p={3} width={[1, 1/2, 1/3]} key={index}>
-              <ItemCard {...item}/>
-            </Box>
-          )}
-        </Flex>
+        <div className="masonry">
+          {data.map((item,index)=><ItemCard {...item} key={index}/>)}
+        </div>
       </div>
-    );
   }}
 />
   

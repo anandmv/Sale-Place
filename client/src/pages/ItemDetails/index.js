@@ -3,18 +3,20 @@ import { Link } from 'react-router-dom';
 import Web3  from 'web3';
 import { Button, Box, Card, Flex, Loader, Image, Heading, EthAddress, Text } from 'rimble-ui';
 import getInstance from '../../utils/getInstance';
-import { FirestoreDocument } from 'react-firestore';
-import { ContentFlex } from './styledComponent'
+import { ContentFlex } from './styledComponent';
+import { withFirestore } from 'react-firestore';
 
-const status = ["Processing" ,"Shipped", "Received", "Refunded"];
+const state = ["Processing" ,"Shipped", "Received", "Refunded"];
 
-class ItemList extends Component {
-  state = { item: {} , itemsPurchased:[], itemsSold:[] };
+class ItemDetails extends Component {
+  state = { item: {} , itemsPurchased:[], itemsSold:[] , isLoading:true};
 
   componentDidMount = async () => {
     try {
+      const itemId = this.props.match.params.id;
       const {accounts, instance} = await getInstance();
-      this.setState({ accounts, instance }, this.getItem);
+      this.setState({ accounts, instance, itemId }, this.getItem);
+      this.getItemPurchased();
     } catch (error) {
       alert(
         `Failed to load contract. Check console for details.`,
@@ -32,25 +34,57 @@ class ItemList extends Component {
     return address.toString() === this.state.accounts[0].toString() 
   }
 
-  buyItem(){
-    
+  async getItem(){
+      const { firestore } = this.props;
+      const itemId = this.props.match.params.id;
+      firestore.doc(`items/${itemId}`).onSnapshot(snapshot => {
+        const { name , description , image, priceInWei , numberOfItems, seller } = snapshot.data();
+        const price = Web3.utils.fromWei(priceInWei, 'ether')
+        this.setState({ name, priceInWei, price , image, seller, description, numberOfItems, isLoading:false});
+      });
+  }
+
+  async buyItem(){
+    const {accounts, instance, itemId, name,  priceInWei , seller } = this.state;
+    const numberOfItems = 1;
+    const buyer = accounts[0];
+    const documentRef = this.props.firestore.collection(`invoices`);
+
+    const invoiceRef = await documentRef.add({ itemId, numberOfItems , buyer, amountPaid: priceInWei, state: state[0], seller: seller })
+
+    const response = await instance.methods.buyItem(itemId, invoiceRef.id,numberOfItems).send({ from: buyer , value: priceInWei});
+
+    if(response.status){
+      alert(`${name} purcahse successfully!`)
+      this.getItemPurchased();
+      delete response.events
+      const logs = response;
+      await this.props.firestore.doc(`invoices/${invoiceRef.id}`).update({status: true, logs, timestamp: new Date().toISOString()})
+    }
+  }
+
+  getItemPurchased(){
+    const { firestore } = this.props;
+    const itemId = this.props.match.params.id;
+    firestore.collection(`invoices`).where("itemId", "==",itemId).onSnapshot(snapshot => {
+      const invoices = [];
+      snapshot.docs.forEach((invoice)=>{
+        invoices.push(invoice.data())
+      })
+      console.log(invoices)
+      this.setState({itemsPurchased:invoices})
+    })
   }
 
   render() {
-    const itemId = this.props.match.params.id;
-
+    if(this.state.isLoading){
+      return <Loader size="100px"/>
+    }
+    const { itemId, name, price , image, seller, description, numberOfItems, itemsPurchased,itemsSold } = this.state
     return <>
-    <FirestoreDocument
-      path={`items/${itemId}`}
-      render={({ isLoading, data }) => {
-        if(isLoading){
-          return <Loader size="100px"/>
-        }
-        console.log(data)
-        const { name, priceInWei , image, seller, description, numberOfItems} = data;
-        return <Card>
+        <Card>
             <Heading.h4>{name}</Heading.h4>
-            {this.isActionOwner(seller) && <Link to={`/item/${data.id}/edit`}>Edit Item</Link>}
+            {this.isActionOwner(seller) && <Link to={`/item/${itemId}/edit`}>Edit Item</Link>}
             <Flex>
               <Box p={3} width={1 / 2}>
                 <Image borderRadius={8} src={image} />
@@ -58,21 +92,51 @@ class ItemList extends Component {
               <Box p={3} width={1 / 2}>
                 <ContentFlex>
                   <Text>{description}</Text>
-                  <Heading.h4>{Web3.utils.fromWei(priceInWei, 'ether')} ETH</Heading.h4>
+                  <Heading.h4>{price} ETH</Heading.h4>
                   <Text>Seller <EthAddress address={seller} truncate/></Text>
                   <Text>Only {numberOfItems} items left </Text>
-                  {numberOfItems > 0 && <Button onClick={this.buyItem}>Buy</Button>}
+                  {numberOfItems > 0 && <Button onClick={this.buyItem.bind(this)}>Buy</Button>}
                   {numberOfItems === 0 && <Button disabled>SoldOut</Button>}
                 </ContentFlex>
               </Box>
             </Flex>
         </Card>
-      }}
-    />
-    
+        {itemsPurchased.length > 0 && 
+        <Card>
+          <Heading.h4>Purcahse history</Heading.h4>
+          {itemsPurchased.map((itemPurchased,index)=>
+          <div key={index}>
+            <hr/>
+            <Heading.h6>Status: {itemPurchased.state}</Heading.h6>
+            <Text>Number of Items purcahsed {itemPurchased.numberOfItems}</Text>
+            <Text>You have purchased this item on {this.getDateTime(itemPurchased.timestamp)}</Text>
+            {itemPurchased.state === state[1] && this.isActionOwner(itemPurchased.buyer) && <Button onClick = {()=>this.updateStatus(itemPurchased.state,'',itemPurchased.index)}> Set as Received </Button>}
+          </div>
+          )}
+        </Card>
+        }
+
+        {this.isActionOwner(seller) && itemsPurchased.length > 0 && 
+          <Card>
+          <Heading.h4>Items Sold history</Heading.h4>
+          {itemsPurchased.map((itemSold,index)=>
+            <div key={index}>
+              <hr/>
+              <Heading.h6>Status: {itemSold.state}</Heading.h6>
+              <Text>Number of Items Sold : {itemSold.numberOfItems}</Text>
+              <Text>User have purchased this item on {this.getDateTime(itemSold.timestamp)}</Text>
+              <Text> Buyer <EthAddress address={itemSold.buyer} truncate/></Text>
+              {parseInt(itemSold.status) === 0 && <Button onClick = {()=>this.updateStatus('Processing', itemSold.buyer, itemSold.index)}> Set as Shipped </Button>}
+              <br/>
+              { parseInt(itemSold.status) < 3 && <Button onClick = {()=>this.updateStatus('Received', itemSold.buyer, itemSold.index)}> Refund </Button>}
+            </div>
+          )}
+          
+          </Card>
+        }
     </>
   }
 
 }
 
-export default ItemList;
+export default withFirestore(ItemDetails);

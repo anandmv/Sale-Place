@@ -9,14 +9,19 @@ class ItemForm extends Component {
     item: null,
     isEdit: false,
     isLoading: true,
-    name:'', image:'', description:'', price:'', numberOfItems:'', priceInEth:''
+    name:'',
+    image:'', 
+    description:'', 
+    price:'', 
+    numberOfItems:'', 
+    priceInEth:'',
+    logs:[]
   };
 
   componentDidMount = async () => {
     const {accounts, instance} = await getInstance();
     let isEdit = !!this.props.match.params.id;
     this.setState({ accounts, instance, isEdit, isLoading: isEdit }, this.getItem);
-    console.log(this.props.firestore)
   }
 
   getItem(){
@@ -24,36 +29,60 @@ class ItemForm extends Component {
       const { firestore } = this.props;
       const itemId = this.props.match.params.id;
       firestore.doc(`items/${itemId}`).onSnapshot(snapshot => {
-        const { name , description , image, priceInWei , numberOfItems} = snapshot.data();
+        const { name , description , image, priceInWei , numberOfItems, logs = []} = snapshot.data();
         const price = Web3.utils.fromWei(priceInWei, 'ether')
-        console.log(price, priceInWei)
-        this.setState({ name , description , image, price , numberOfItems, isLoading: false });
+        this.setState({ name , description , image, price , numberOfItems, isLoading: false, logs});
       });
     }
   }
 
   addUpdateItem = async ()=> {
-    const { name , description , image, price , numberOfItems, isEdit } = this.state;
-    const itemId = this.props.match.params.id;
+    const { name , description , image, price , numberOfItems, isEdit, accounts, instance } = this.state;
+    let itemId = this.props.match.params.id;
     const priceInWei = Web3.utils.toWei(price, 'ether')
+    const seller = accounts[0];      
+    let status = false;
+    let logs = this.state.logs;
     if(!isEdit){
-      const collectionRef = this.props.firestore.collection('items');
-      const itemRef = await collectionRef.add({
-        name , image, description, priceInWei, numberOfItems
+      const documentRef = this.props.firestore.collection('items');
+      const itemRef = await documentRef.add({
+        name , image, description, priceInWei, numberOfItems, status
       })
-      console.log(itemRef)
+      itemId = itemRef.id
+      this.setState({itemId});
+      try{
+        const response = await instance.methods.addItem(itemId, name , image, description, priceInWei, numberOfItems ).send({ from: seller });
+        delete response.events
+        status = true
+        logs.push(response)
+      }
+      catch(e){
+        console.log(e)
+      }
+      await this.props.firestore.doc(`items/${itemId}`).update({status, logs, seller})
     }else{
       const documentRef = this.props.firestore.doc(`items/${itemId}`);
-      await documentRef.update({name , image, description, priceInWei, numberOfItems })
+      console.log(itemId, name , image, description, priceInWei, numberOfItems)
+      try{
+        const response = await instance.methods.updateItem( itemId, name , image, description, priceInWei, numberOfItems ).send({ from: seller });
+        delete response.events
+        status = true
+        logs.push(response)
+      }
+      catch(e){
+        console.log(e)
+      }
+      await documentRef.update({name , image, description, priceInWei, numberOfItems, status, logs, seller})
     }
+    this.setState({itemId})
   }
 
   handleSubmit = async (e) => {
     this.setState({submitting:true});
     e.preventDefault();
     await this.addUpdateItem();
-    console.log(this.state.item)
     this.setState({submitting:false});
+    this.props.history.push(`/item/${this.state.itemId}`)
   };
 
   handleValueChange = e => {
@@ -64,7 +93,7 @@ class ItemForm extends Component {
   render() {
     const { isEdit, isLoading } = this.state;
     if(isLoading){
-      return <Loader />
+      return <Loader size="100px"/>
     }
     return  <Card>
         <Heading.h2> {isEdit ? 'Update': 'Create'} Item </Heading.h2>

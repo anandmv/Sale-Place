@@ -171,16 +171,14 @@ contract SalePlace {
   trade(_itemId,_numberOfItems)
   returns(bool){
     require(_numberOfItems>0, 'Number of items should be atleast 1');
-    require(items[_itemId].numberOfItems >= _numberOfItems, 'Out of stock');
+    require(items[_itemId].numberOfItems <= _numberOfItems, 'Out of stock');
 
-    ItemInvoice memory newItemInvoice;
-    newItemInvoice.status = Status.Processing;
-    newItemInvoice.numberOfItemsSold = _numberOfItems;
-    newItemInvoice.buyer = msg.sender;
-    newItemInvoice.timestamp = now;
-    newItemInvoice.itemId = _itemId;
-    newItemInvoice.amountPaid = _numberOfItems.mul(items[_itemId].price);
-    itemsSold[_invoiceId] = newItemInvoice;
+    itemsSold[_invoiceId].status = Status.Processing;
+    itemsSold[_invoiceId].numberOfItemsSold = _numberOfItems;
+    itemsSold[_invoiceId].buyer = msg.sender;
+    itemsSold[_invoiceId].timestamp = now;
+    itemsSold[_invoiceId].itemId = _itemId;
+    itemsSold[_invoiceId].amountPaid = _numberOfItems.mul(items[_itemId].price);
 
     items[_itemId].numberOfItems = items[_itemId].numberOfItems.sub(1);
 
