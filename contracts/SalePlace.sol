@@ -1,21 +1,11 @@
 pragma solidity ^0.5.0;
 
-/// @title Sale Place Solidity Contract
-/// @author Larry A. Gardner
-/// @notice You can use this contract for selling an item with mutiple users
-/// @dev All function calls are currently implemented without side effects
-contract SalePlace {
+import "./SafeMath.sol";
+import "./Pausable.sol";
 
-  /* A variable to track the item count/sequence */
-  uint itemId;
+contract SalePlace is Pausable{
 
-  /* Staus Enum used bu ItemSold ,with 4 states
-    Processing
-    Shipped
-    Received
-    Refunded
-  */
-  enum Status { Processing ,Shipped, Received, Refunded }
+  using SafeMath for uint;
 
   struct Item {
     string name;
@@ -27,121 +17,67 @@ contract SalePlace {
     address payable seller;
   }
 
-  struct ItemSold{
+  /* Staus Enum used by ItemInvoice ,with 4 states
+    Processing
+    Shipped
+    Received
+    Refunded
+  */
+  enum Status { Processing ,Shipped, Received, Refunded }
+
+  struct ItemInvoice{
+    string itemId;
     uint numberOfItemsSold;
+    uint amountPaid;
     Status status;
     uint timestamp;
     address payable buyer;
   }
 
-  mapping (uint => Item) public items;
-  mapping (address => uint[]) private itemsPurcahsed;
-  mapping (uint => ItemSold[]) private itemsSold;
+  mapping (string => Item) private items;
+  mapping (string => ItemInvoice) private itemsSold;
 
-  constructor() public{
-    itemId = 0;
-  }
-
-  modifier isSeller(uint _itemId){
+  modifier isSeller(string memory _itemId){
     _;
-    require(items[_itemId].seller!= address(0) && items[_itemId].seller == msg.sender);
+    require(items[_itemId].seller != address(0) && items[_itemId].seller == msg.sender, "should be the seller to process forward");
   }
 
-  modifier isBuyer(uint _itemId){
+  modifier isBuyer(string memory _itemId){
     _;
-    bool havePurchase = false;
-    for( uint index = 0 ; index < itemsSold[_itemId].length; index++){
-        if(itemsSold[_itemId][index].buyer == msg.sender){
-            havePurchase = true;
-        }
-    }
-    require(havePurchase == true, "should be a buyer to process forward");
+    require(itemsSold[_itemId].buyer != address(0) && itemsSold[_itemId].buyer == msg.sender, "should be a buyer to process forward");
   }
 
+  event LogAddItem(address seller, string itemId , uint numberOfItems, uint price);
+  event LogUpdateItem(address seller, string itemId , uint numberOfItems, uint price);
+  event LogBuyItem(address buyer, string invoiceId, uint numberOfItems);
+  event LogShipped(address seller, string invoiceId, string itemId);
+  event LogReceived(address buyer, string invoiceId, string itemId);
+  event LogRefund(address seller, address buyer, string invoiceId, string itemId, uint amountRefunded);
 
   /// @notice Trade logic called when items are purchased by a user
-  /// @param _itemId id of the item to fetch 
+  /// @param _itemId id of the item to fetch
   /// @param _numberOfItems number of the items purchased
   /// @dev the function will trade amount from buyer to seller , also any left over amount will be transfered to buyer itself
-  modifier trade (uint _itemId, uint _numberOfItems)  {
+  modifier trade (string memory _itemId, uint _numberOfItems)  {
     _;
-    uint totalAmount = _numberOfItems * items[_itemId].price;
-    require(msg.value >= totalAmount , 'Amount less than required');
+    uint totalAmount = _numberOfItems.mul(items[_itemId].price);
+    require(msg.value >= totalAmount, 'Amount less than required');
 
-    uint amountToRefund = msg.value - items[_itemId].price;
+    uint amountToRefund = msg.value.sub(items[_itemId].price);
     if(amountToRefund>0){
       msg.sender.transfer(amountToRefund); // transfer left over to buyer
     }
     items[_itemId].seller.transfer(items[_itemId].price); // send the money to seller
   }
 
-  event LogAddItem(address seller, uint itemId , uint numberOfItems, uint price);
-  event LogUpdateItem(address seller, uint itemId , uint numberOfItems, uint price);
-  event LogBuyItem(address buyer, uint itemId , uint numberOfItems);
-  event LogShipped(address seller, uint itemId);
-  event LogReceived(address buyer, uint itemId);
-  event LogRefund(address seller, address buyer, uint itemId, uint amountRefunded);
-
-  /// @notice Get items size of the mapping
-  /// @return total items present
-  function getItemsSize()
-  public
-  view returns (uint) {
-    return itemId;
-  }
-  
-  /// @notice Get itemsSold size of the mapping
-  /// @return total itemsSold present
-  function getItemsSoldSize(uint _itemId)
-  public
-  view returns (uint) {
-    return  itemsSold[_itemId].length;
-  }
-
-  /// @notice Get itemsSold index of the purchasedItem
-  /// @return array of indexs
-  function getItemPurchasedSize(uint _itemId)
-  public
-  view returns (uint[] memory) {
-    uint pushIndex = 0;
-    uint[] memory purcahseIndex = new uint[](10);
-    for( uint index = 0 ; index < itemsSold[_itemId].length && pushIndex < 10; index++){
-        if(itemsSold[_itemId][index].buyer == msg.sender){
-            purcahseIndex[pushIndex] = index;
-            pushIndex++;
-        }
-    }
-    return purcahseIndex;
-  }
-
-  /// @notice Get list of item id's purcahsed by user
-  /// @return array of itemIds
-  function getItemsPurchased()
-  public
-  view returns (uint[] memory) {
-    return itemsPurcahsed[msg.sender];
-  }
-
-  /// @notice Get list of item status and buyer address sold for the respective item
-  /// @return array of itemIds
-  function getItemSold(uint _itemId, uint _index)
-  public
-  isSeller(_itemId)
-  view returns (uint numberOfItems,Status status, uint timestamp, address buyer){
-    require(itemsSold[_itemId][_index].buyer!= address(0) , "No item to display");
-    numberOfItems = itemsSold[_itemId][_index].numberOfItemsSold;
-    status = itemsSold[_itemId][_index].status;
-    timestamp = itemsSold[_itemId][_index].timestamp;
-    buyer = itemsSold[_itemId][_index].buyer;
-    return (numberOfItems,status, timestamp, buyer);
-  }
 
   /// @notice Get am item based on item id
   /// @param _itemId id of the item to fetch
   /// @return id, name, image , description , price , number of Items left, timestamp and seller address of the item
-  function getItem(uint _itemId)
+  function getItem(string memory _itemId)
   public
-  view returns (uint id, string memory name, string memory image, string memory description, uint price, uint numberOfItems, address seller, uint timestamp) {
+  view
+  returns (string memory id, string memory name, string memory image, string memory description, uint price, uint numberOfItems, address seller, uint timestamp) {
     id = _itemId;
     name = items[_itemId].name;
     image = items[_itemId].image;
@@ -154,45 +90,38 @@ contract SalePlace {
   }
 
   /// @notice Get item purcahsed details of the request user mapping for given item
-  /// @param _itemId id of the item to fetch 
-  /// @param _index index of the purcahse item to fetch 
-  /// @return itemId, number of Items sold , status,timestamp and buyer address
-  function getItemPurchased(uint _itemId, uint _index)
+  /// @param _invoiceId  invoice id of the item sold to fetch 
+  /// @return itemId, invoiceId, number of Items sold , status, timestamp, buyer address & amount paid
+  function getItemSold(string memory _invoiceId)
   public 
   view 
-  isBuyer(_itemId)
-  returns (uint , uint, uint , Status, address, uint) {
-    ItemSold memory itemSold = itemsSold[_itemId][_index];
-    return (_itemId, _index, itemSold.numberOfItemsSold, itemSold.status, itemSold.buyer, itemSold.timestamp);
-  }
-  
-  /// @notice Get item sold array index for a given item id and buyer address
-  /// @param _itemId id of the item to fetch 
-  /// @param _buyer address of the buyer 
-  /// @return itemId, number of Items sold , status and buyer address
-  function getItemSoldIndex(uint _itemId, address _buyer, uint _itemSoldIndex)
-  private
-  view
-  returns(uint){
-    require(itemsSold[_itemId][_itemSoldIndex].buyer != address(0), 'Item sold not found');
-
-    require(itemsSold[_itemId][_itemSoldIndex].buyer == _buyer, 'Not owner of the record');    
-    return _itemSoldIndex;
+  isBuyer(_invoiceId)
+  returns (string memory itemId, string memory invoiceId, uint numberOfItemsSold, Status status, address buyer, uint timestamp, uint amountPaid) {
+    itemId = itemsSold[_invoiceId].itemId;
+    invoiceId = _invoiceId;
+    numberOfItemsSold = itemsSold[_invoiceId].numberOfItemsSold;
+    status = itemsSold[_invoiceId].status;
+    buyer = itemsSold[_invoiceId].buyer;
+    timestamp = itemsSold[_invoiceId].timestamp;
+    amountPaid = itemsSold[_invoiceId].amountPaid;
+    return (itemId, invoiceId, numberOfItemsSold, status, buyer, timestamp, amountPaid);
   }
 
-  /// @notice Add item 
+  /// @notice Add item
   /// @dev Emits LogAddItem
+  /// @param _itemId id of the item
   /// @param _name name of the item
   /// @param _image image url of the item
   /// @param _description description of the item
   /// @param _price price of the item
   /// @param _numberOfItems number of the item to sell
   /// @return true if item is created
-  function addItem(string memory _name, string memory _image, string memory _description, uint _price, uint _numberOfItems)
+  function addItem(string memory _itemId,string memory _name, string memory _image, string memory _description, uint _price, uint _numberOfItems)
   public
+  whenNotPaused()
   returns(bool){
-    require(_numberOfItems>0 , 'Number of items should be atleast 1');
-    require(_price>0 , 'Price of items cannot be atleast 0');
+    require(_numberOfItems>0, 'Number of items should be atleast 1');
+    require(_price>0, 'Price of items cannot be atleast 0');
     Item memory newItem;
     newItem.name = _name;
     newItem.image = _image;
@@ -201,13 +130,12 @@ contract SalePlace {
     newItem.numberOfItems = _numberOfItems;
     newItem.seller = msg.sender;
     newItem.timestamp = now;
-    items[itemId] = newItem;
-    emit LogAddItem(msg.sender, itemId, _numberOfItems, _price);
-    itemId++;
+    items[_itemId] = newItem;
+    emit LogAddItem(msg.sender, _itemId, _numberOfItems, _price);
     return true;
   }
 
-  /// @notice Update item 
+  /// @notice Update item
   /// @dev Emits LogUpdateItem
   /// @dev Need to be seller of the item to update
   /// @param _itemId id of the item
@@ -217,12 +145,13 @@ contract SalePlace {
   /// @param _price price of the item
   /// @param _numberOfItems number of the item to sell
   /// @return true if item is udpated
-  function updateItem(uint _itemId, string memory _name, string memory _image, string memory _description, uint _price, uint _numberOfItems)
+  function updateItem(string memory _itemId, string memory _name, string memory _image, string memory _description, uint _price, uint _numberOfItems)
   public
+  whenNotPaused()
   isSeller(_itemId)
   returns(bool){
-    require(_numberOfItems>0 , 'Number of items should be atleast 1');
-    require(_price>0 , 'Price of items cannot be atleast 0');
+    require(_numberOfItems>0, 'Number of items should be atleast 1');
+    require(_price>0, 'Price of items cannot be atleast 0');
     items[_itemId].name = _name;
     items[_itemId].image = _image;
     items[_itemId].description = _description;
@@ -236,28 +165,28 @@ contract SalePlace {
   /// @dev Emits LogBuyItem
   /// @dev Amount paid more than required will be refunded
   /// @param _itemId id of the item
+  /// @param _invoiceId id of the invoice item sold
   /// @param _numberOfItems number of the item to buy
   /// @return true if items are bought
-  function buyItem(uint _itemId, uint _numberOfItems) 
-  public 
+  function buyItem(string memory _itemId, string memory _invoiceId, uint _numberOfItems)
+  public
   payable
+  whenNotPaused()
   trade(_itemId,_numberOfItems)
   returns(bool){
-    require(_numberOfItems>0 , 'Number of items should be atleast 1');
-    require(items[_itemId].numberOfItems >= _numberOfItems, 'Out of stock');
+    require(_numberOfItems>0, 'Number of items should be atleast 1');
+    require(items[_itemId].numberOfItems - _numberOfItems >= 0, 'Out of stock');
 
-    ItemSold memory newItemSold;
-    newItemSold.status = Status.Processing;
-    newItemSold.numberOfItemsSold = _numberOfItems;
-    newItemSold.buyer = msg.sender;
-    newItemSold.timestamp = now;
-    itemsSold[_itemId].push(newItemSold);
+    itemsSold[_invoiceId].status = Status.Processing;
+    itemsSold[_invoiceId].numberOfItemsSold = _numberOfItems;
+    itemsSold[_invoiceId].buyer = msg.sender;
+    itemsSold[_invoiceId].timestamp = now;
+    itemsSold[_invoiceId].itemId = _itemId;
+    itemsSold[_invoiceId].amountPaid = _numberOfItems.mul(items[_itemId].price);
 
-    items[_itemId].numberOfItems = items[_itemId].numberOfItems - 1;
+    items[_itemId].numberOfItems = items[_itemId].numberOfItems.sub(1);
 
-    itemsPurcahsed[msg.sender].push(_itemId);
-
-    emit LogBuyItem(msg.sender, _itemId , _numberOfItems);
+    emit LogBuyItem(msg.sender, _itemId, _numberOfItems);
 
     return true;
   }
@@ -265,33 +194,31 @@ contract SalePlace {
   /// @notice Function called by seller to set item status to shipped
   /// @dev Emits LogShipped
   /// @dev Needs to be seller of the itemto access the function
-  /// @param _itemId id of the item
-  /// @param _buyer address of buyer
+  /// @param _invoiceId id of the invoice id of item sold
   /// @return true if items is udpated to shipped status
-  function shipItem(uint _itemId, address _buyer, uint _itemSoldIndex)
+  function shipItem(string memory _invoiceId)
   public
-  isSeller(_itemId)
   returns(bool){
-    uint itemIndex = getItemSoldIndex(_itemId, _buyer, _itemSoldIndex);
-    require(itemsSold[_itemId][itemIndex].status == Status.Processing , 'Item already shipped');
-    itemsSold[_itemId][itemIndex].status = Status.Shipped;
-    emit LogShipped(msg.sender, _itemId);
+    require(itemsSold[_invoiceId].status == Status.Processing, 'Item already shipped');
+    require(items[itemsSold[_invoiceId].itemId].seller == msg.sender, 'Action restricted to seller only');
+    itemsSold[_invoiceId].status = Status.Shipped;
+    emit LogShipped(msg.sender, _invoiceId, itemsSold[_invoiceId].itemId);
     return true;
   }
 
   /// @notice Function called by buyer to set item status to received
   /// @dev Emits LogReceived
   /// @dev Needs to be buyer of the item to access the function
-  /// @param _itemId id of the item
+  /// @param _invoiceId id of the invoice id of item sold
   /// @return true if items is udpated to received status
-  function receiveItem(uint _itemId, uint _itemSoldIndex)
+  function receiveItem(string memory _invoiceId)
   public
-  isBuyer(_itemId)
+  isBuyer(_invoiceId)
   returns(bool){
-    uint itemIndex = getItemSoldIndex(_itemId, msg.sender, _itemSoldIndex);
-    require(itemsSold[_itemId][itemIndex].status == Status.Shipped , 'Item not yet shipped');
-    itemsSold[_itemId][itemIndex].status = Status.Received;
-    emit LogReceived(msg.sender, _itemId);
+    require(itemsSold[_invoiceId].status == Status.Shipped , 'Item not yet shipped');
+    require(itemsSold[_invoiceId].buyer == msg.sender, 'Action restricted to buyer only');
+    itemsSold[_invoiceId].status = Status.Received;
+    emit LogReceived(msg.sender, _invoiceId, itemsSold[_invoiceId].itemId);
     return true;
   }
 
@@ -299,26 +226,28 @@ contract SalePlace {
   /// @dev Emits LogRefund
   /// @dev Needs to be seller of the item to access the function
   /// @dev Amount is transfered from seller account to buyer account , any left over paid will transfered to the seller itself
-  /// @param _itemId id of the item
-  /// @param _buyer address of buyer
+  /// @param _invoiceId id of the invoice id of item sold
   /// @return true if refund is successfull
-  function refundItem(uint _itemId, address _buyer, uint _itemSoldIndex)
-  public 
+  function refundItem(string memory _invoiceId)
+  public
   payable
-  isSeller(_itemId)
   returns(bool){
-    uint itemIndex = getItemSoldIndex(_itemId, _buyer,_itemSoldIndex);
-    uint totalAmount = itemsSold[_itemId][itemIndex].numberOfItemsSold * items[_itemId].price;
-    require(msg.value >= totalAmount , 'Amount less than required');
-    
-    itemsSold[_itemId][itemIndex].buyer.transfer(totalAmount); // transfer to buyer
+    string memory itemId = itemsSold[_invoiceId].itemId;
+    require(items[itemId].seller == msg.sender, 'Action restricted to seller only');
 
-    uint amountLeftOver = msg.value - items[_itemId].price;
+    require(msg.value >= itemsSold[_invoiceId].amountPaid, 'Amount less than required');
+    require(itemsSold[_invoiceId].amountPaid > 0, 'Total amount to refund should be greater than zero');
+
+    itemsSold[_invoiceId].buyer.transfer(itemsSold[_invoiceId].amountPaid); // transfer to buyer
+
+    uint amountLeftOver = msg.value.sub(itemsSold[_invoiceId].amountPaid);
+    
     if(amountLeftOver>0){
-      items[_itemId].seller.transfer(amountLeftOver); // transfer any left over to seller
+      items[itemId].seller.transfer(amountLeftOver); // transfer any left over to seller
     }
-    itemsSold[_itemId][itemIndex].status = Status.Refunded;
-    emit LogRefund(msg.sender, itemsSold[_itemId][itemIndex].buyer, _itemId, totalAmount);
+    itemsSold[_invoiceId].status = Status.Refunded;
+    
+    emit LogRefund(msg.sender, itemsSold[_invoiceId].buyer, _invoiceId, itemId, itemsSold[_invoiceId].amountPaid);
     return true;
   }
 }

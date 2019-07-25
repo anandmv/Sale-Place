@@ -14,16 +14,21 @@ contract("SalePlace", accounts => {
   const numberOfItems = 100
   const excessAmount = (parseInt(price)+100).toString()
 
+  const itemId = "item1"
+  const invoiceId = "invoice1"
+
   let instance
 
+  const addItem = () => instance.addItem(itemId, name, image, description, price, numberOfItems, {from: alice})
+
   beforeEach(async () => {
-      instance = await SalePlace.new()
+      instance = await SalePlace.new({from: owner})
   })
 
   it("should add an item with the provided details", async() => {
-      const tx = await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
+      await addItem()
               
-      const result = await instance.getItem.call(0)
+      const result = await instance.getItem.call(itemId)
 
       assert.equal(result[1], name, 'the name of the last added item does not match the expected value')
       assert.equal(result[2], image, 'the image of the last added item does not match the expected value')
@@ -35,7 +40,7 @@ contract("SalePlace", accounts => {
 
   it("should emit a LogAddItem event when an item is added", async()=> {
     let eventEmitted = false
-    const tx = await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
+    const tx = await addItem()
     
     if (tx.logs[0].event == "LogAddItem") {
         eventEmitted = true
@@ -45,11 +50,11 @@ contract("SalePlace", accounts => {
   })
 
   it("should add allow item to be udpated by seller", async() => {
-      await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
+      await addItem()
 
-      const tx = await instance.updateItem(0, name+"test", image+"test", description+"test", price+"1", numberOfItems+10, {from: alice})
+      const tx = await instance.updateItem(itemId, name+"test", image+"test", description+"test", price+"1", numberOfItems+10, {from: alice})
 
-      const result = await instance.getItem.call(0)
+      const result = await instance.getItem.call(itemId)
 
       assert.equal(result[1], name+"test", 'the name of the last updated item does not match the expected value')
       assert.equal(result[2], image+"test", 'the image of the last updated item does not match the expected value')
@@ -61,9 +66,9 @@ contract("SalePlace", accounts => {
 
   it("should emit a LogUpdateItem event when an item is updated", async()=> {
     let eventEmitted = false
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
+    await addItem()
 
-    const tx = await instance.updateItem(0, name, image, description, price+1, numberOfItems, {from: alice})
+    const tx = await instance.updateItem(itemId, name, image, description, price+1, numberOfItems, {from: alice})
     
     if (tx.logs[0].event == "LogUpdateItem") {
         eventEmitted = true
@@ -73,21 +78,21 @@ contract("SalePlace", accounts => {
   })
 
   it("should revert if an address other than the seller calls updateItem()", async()=>{
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await catchRevert(instance.updateItem(0, name, image, description, price+1, numberOfItems, {from: bob}))
+    await addItem()
+    await catchRevert(instance.updateItem(itemId, name, image, description, price+1, numberOfItems, {from: bob}))
   })
 
   it("should allow someone to purchase an item and update state accordingly", async() => {
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
+    await addItem()
     var aliceBalanceBefore = await web3.eth.getBalance(alice)
     var bobBalanceBefore = await web3.eth.getBalance(bob)
 
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
 
     var aliceBalanceAfter = await web3.eth.getBalance(alice)
     var bobBalanceAfter = await web3.eth.getBalance(bob)
 
-    const result = await instance.getItemPurchased(0,0,{from: bob})
+    const result = await instance.getItemSold(invoiceId,{from: bob})
 
     assert.equal(result[2], 1, 'number of items sold should be 1')
     assert.equal(result[3].toString(10), 0, 'the state of the item sold should be "Processing", which should be declared first in the State Enum')
@@ -97,15 +102,15 @@ contract("SalePlace", accounts => {
   })
 
   it("should error when not enough value is sent when purchasing an item", async()=>{
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await catchRevert(instance.buyItem(0, 1, {from: bob, value: price-1}))
+    await addItem()
+    await catchRevert(instance.buyItem(itemId, invoiceId, 1, {from: bob, value: price-1}))
   })
 
   it("should emit LogSold event when and item is purchased", async()=>{
     var eventEmitted = false
 
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    const tx = await instance.buyItem(0, 1, {from: bob, value: excessAmount})
+    await addItem()
+    const tx = await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
 
     if (tx.logs[0].event == "LogBuyItem") {
         eventEmitted = true
@@ -115,17 +120,17 @@ contract("SalePlace", accounts => {
   })
 
   it("should revert when someone that is not the seller tries to call shipItem()", async()=>{
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1,  {from: bob, value: price})
-    await catchRevert(instance.shipItem(0, bob, 0, {from: bob}))
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1,  {from: bob, value: price})
+    await catchRevert(instance.shipItem(invoiceId, {from: bob}))
   })
 
   it("should allow the seller to mark the item as shipped", async() => {
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
-    await instance.shipItem(0,bob, 0, {from: alice})
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    await instance.shipItem(invoiceId, {from: alice})
 
-    const result = await instance.getItemPurchased(0,0, {from: bob})
+    const result = await instance.getItemSold(invoiceId, {from: bob})
 
     assert.equal(result[3].toString(10), 1, 'the state of the item should be "Shipped", which should be declared third in the State Enum')
   })
@@ -133,9 +138,9 @@ contract("SalePlace", accounts => {
   it("should emit a LogShipped event when an item is shipped", async() => {
     var eventEmitted = false
 
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
-    const tx = await instance.shipItem(0,bob, 0, {from: alice})
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    const tx = await instance.shipItem(invoiceId, {from: alice})
 
     if (tx.logs[0].event == "LogShipped") {
         eventEmitted = true
@@ -145,54 +150,54 @@ contract("SalePlace", accounts => {
   })
 
   it("should allow the buyer to mark the item as received", async() => {
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
-    await instance.shipItem(0,bob, 0, {from: alice})
-    await instance.receiveItem(0, 0, {from: bob})
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    await instance.shipItem(invoiceId, {from: alice})
+    await instance.receiveItem(invoiceId, {from: bob})
 
-    const result = await instance.getItemPurchased(0,0, {from: bob})
+    const result = await instance.getItemSold(invoiceId, {from: bob})
 
     assert.equal(result[3].toString(10), 2, 'the state of the item should be "Received", which should be declared fourth in the State Enum')
   })
 
   it("should revert if an address other than the buyer calls receiveItem()", async() =>{
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
-    await instance.shipItem(0,bob, 0, {from: alice})
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    await instance.shipItem(invoiceId, {from: alice})
     
-    await catchRevert(instance.receiveItem(0, 0, {from: alice}))
+    await catchRevert(instance.receiveItem(invoiceId, {from: alice}))
   })
 
   it("should emit a LogReceived event when an item is received", async() => {
     var eventEmitted = false
 
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
-    await instance.shipItem(0,bob, 0, {from: alice})
-    const tx = await instance.receiveItem(0, 0, {from: bob})
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    await instance.shipItem(invoiceId, {from: alice})
+    const tx = await instance.receiveItem(invoiceId, {from: bob})
     
     if (tx.logs[0].event == "LogReceived") {
         eventEmitted = true
     }
 
-    assert.equal(eventEmitted, true, 'adding an item should emit a Shipped event')
+    assert.equal(eventEmitted, true, 'adding an item should emit a Received event')
   })
 
   it("should allow the seller to refund the item paid", async() => {
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
-    await instance.shipItem(0,bob, 0, {from: alice})
-    await instance.receiveItem(0, 0, {from: bob})
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    await instance.shipItem(invoiceId, {from: alice})
+    await instance.receiveItem(invoiceId, {from: bob})
 
     var aliceBalanceBefore = await web3.eth.getBalance(alice)
     var bobBalanceBefore = await web3.eth.getBalance(bob)
 
-    await instance.refundItem(0,bob,0, {from: alice, value: price})
+    await instance.refundItem(invoiceId, {from: alice, value: price})
 
     var aliceBalanceAfter = await web3.eth.getBalance(alice)
     var bobBalanceAfter = await web3.eth.getBalance(bob)
 
-    const result = await instance.getItemPurchased(0,0, {from: bob})
+    const result = await instance.getItemSold(invoiceId, {from: bob})
 
     assert.equal(result[3].toString(10), 3, 'the state of the item should be "Refunded", which should be declared fourth in the State Enum')
 
@@ -200,12 +205,48 @@ contract("SalePlace", accounts => {
     assert.equal(Number(bobBalanceAfter), Number(new BN(bobBalanceBefore).add(new BN(price))), "bob's balance should be increased by more than the price of the item (including gas costs)")
   })
 
-  it("should revert if an address other than the seller calls refundItem()", async() =>{
-    await instance.addItem(name, image, description, price, numberOfItems, {from: alice})
-    await instance.buyItem(0, 1, {from: bob, value: excessAmount})
-    await instance.shipItem(0,bob, 0, {from: alice})
-    await instance.receiveItem(0, 0, {from: bob})
+  it("should emit a LogRefund event when an item is refunded", async() => {
+    var eventEmitted = false
+
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    await instance.shipItem(invoiceId, {from: alice})
+    await instance.receiveItem(invoiceId, {from: bob})
+
+    const tx = await instance.refundItem(invoiceId, {from: alice, value: price})
     
-    await catchRevert(instance.refundItem(0,bob,0, {from: bob, value: price}))
+    if (tx.logs[0].event == "LogRefund") {
+        eventEmitted = true
+    }
+
+    assert.equal(eventEmitted, true, 'adding an item should emit a Refund event')
   })
+
+  it("should revert if an address other than the seller calls refundItem()", async() =>{
+    await addItem()
+    await instance.buyItem(itemId, invoiceId, 1, {from: bob, value: excessAmount})
+    await instance.shipItem(invoiceId, {from: alice})
+    await instance.receiveItem(invoiceId, {from: bob})
+    
+    await catchRevert(instance.refundItem(invoiceId, {from: bob, value: price}))
+  })
+
+  it("should be pausable", async()=> {
+    await instance.pause({from:owner})
+    const result = await instance.paused.call()
+    assert.equal(true, result);
+  });
+
+  it("should be unpausable", async()=> {
+    await instance.pause({from:owner})
+    await instance.unpause({from:owner})
+    const result = await instance.paused.call()
+    assert.equal(false, result);
+  });
+
+  it("should not be pause if not send from owner", async()=> {
+    await catchRevert(instance.pause({from:alice}))
+    const result = await instance.paused.call()
+    assert.equal(false, result);
+  });
 });
