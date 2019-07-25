@@ -59,9 +59,9 @@ SalePlace is a e-commerce app , having only two kinds of user seller and a purch
     ```
     Add the custom RPC endpoint when choosing a network: 
     ```
-    http://127.0.0.1:9545 
+    http://127.0.0.1:7545 
     ```
-    and then refresh the app page. 
+    and then refresh the app page.Please confirm the network url from the truffle GUI/CLI 
     Once the app recognizes your MetaMask account you are good to go!
 
 This project is created out of React Truffle Box https://github.com/truffle-box/react-box
