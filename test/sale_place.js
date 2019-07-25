@@ -3,6 +3,7 @@ const SalePlace = artifacts.require("./SalePlace.sol");
 let catchRevert = require("./exceptionsHelpers.js").catchRevert
 
 contract("SalePlace", accounts => {
+  const owner = accounts[0]
   const alice = accounts[1]
   const bob = accounts[2]
 
@@ -21,7 +22,7 @@ contract("SalePlace", accounts => {
   const addItem = () => instance.addItem(itemId, name, image, description, price, numberOfItems, {from: alice})
 
   beforeEach(async () => {
-      instance = await SalePlace.new()
+      instance = await SalePlace.new({from: owner})
   })
 
   it("should add an item with the provided details", async() => {
@@ -229,4 +230,23 @@ contract("SalePlace", accounts => {
     
     await catchRevert(instance.refundItem(invoiceId, {from: bob, value: price}))
   })
+
+  it("should be pausable", async()=> {
+    await instance.pause({from:owner})
+    const result = await instance.paused.call()
+    assert.equal(true, result);
+  });
+
+  it("should be unpausable", async()=> {
+    await instance.pause({from:owner})
+    await instance.unpause({from:owner})
+    const result = await instance.paused.call()
+    assert.equal(false, result);
+  });
+
+  it("should not be pause if not send from owner", async()=> {
+    await catchRevert(instance.pause({from:alice}))
+    const result = await instance.paused.call()
+    assert.equal(false, result);
+  });
 });

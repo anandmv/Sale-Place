@@ -5,7 +5,6 @@ import { FirestoreCollection } from 'react-firestore';
 
 const ItemList = ()=> <FirestoreCollection
   path="items"
-  filter={['status', '==', true]}
   render={({ isLoading, data }) => {
     if(isLoading){
       return <Loader size="100px"/>
@@ -13,7 +12,7 @@ const ItemList = ()=> <FirestoreCollection
     return <div>
         <h1>Items</h1>
         <div className="masonry">
-          {data.map((item,index)=><ItemCard {...item} key={index}/>)}
+          {data.map((item,index)=>item.status === true && <ItemCard {...item} key={index}/>)}
         </div>
       </div>
   }}

@@ -20,7 +20,7 @@ class ItemForm extends Component {
 
   componentDidMount = async () => {
     const {accounts, instance} = await getInstance();
-    let isEdit = !!this.props.match.params.id;
+    const isEdit = !!this.props.match.params.id;
     this.setState({ accounts, instance, isEdit, isLoading: isEdit }, this.getItem);
   }
 
@@ -62,7 +62,6 @@ class ItemForm extends Component {
       await this.props.firestore.doc(`items/${itemId}`).update({status, logs, seller})
     }else{
       const documentRef = this.props.firestore.doc(`items/${itemId}`);
-      console.log(itemId, name , image, description, priceInWei, numberOfItems)
       try{
         const response = await instance.methods.updateItem( itemId, name , image, description, priceInWei, numberOfItems ).send({ from: seller });
         delete response.events

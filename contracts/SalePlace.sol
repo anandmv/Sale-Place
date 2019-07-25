@@ -1,8 +1,9 @@
 pragma solidity ^0.5.0;
 
 import "./SafeMath.sol";
+import "./Pausable.sol";
 
-contract SalePlace {
+contract SalePlace is Pausable{
 
   using SafeMath for uint;
 
@@ -117,6 +118,7 @@ contract SalePlace {
   /// @return true if item is created
   function addItem(string memory _itemId,string memory _name, string memory _image, string memory _description, uint _price, uint _numberOfItems)
   public
+  whenNotPaused()
   returns(bool){
     require(_numberOfItems>0, 'Number of items should be atleast 1');
     require(_price>0, 'Price of items cannot be atleast 0');
@@ -145,6 +147,7 @@ contract SalePlace {
   /// @return true if item is udpated
   function updateItem(string memory _itemId, string memory _name, string memory _image, string memory _description, uint _price, uint _numberOfItems)
   public
+  whenNotPaused()
   isSeller(_itemId)
   returns(bool){
     require(_numberOfItems>0, 'Number of items should be atleast 1');
@@ -168,10 +171,11 @@ contract SalePlace {
   function buyItem(string memory _itemId, string memory _invoiceId, uint _numberOfItems)
   public
   payable
+  whenNotPaused()
   trade(_itemId,_numberOfItems)
   returns(bool){
     require(_numberOfItems>0, 'Number of items should be atleast 1');
-    require(items[_itemId].numberOfItems <= _numberOfItems, 'Out of stock');
+    require(items[_itemId].numberOfItems - _numberOfItems >= 0, 'Out of stock');
 
     itemsSold[_invoiceId].status = Status.Processing;
     itemsSold[_invoiceId].numberOfItemsSold = _numberOfItems;

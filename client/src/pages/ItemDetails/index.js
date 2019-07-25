@@ -50,7 +50,7 @@ class ItemDetails extends Component {
     const buyer = accounts[0];
     const documentRef = this.props.firestore.collection(`invoices`);
 
-    const invoiceRef = await documentRef.add({ itemId, numberOfItems , buyer, amountPaid: priceInWei, state: state[0], seller: seller })
+    const invoiceRef = await documentRef.add({ itemId, numberOfItems , buyer, amountPaid: priceInWei, state: state[0], seller: seller, status:false })
 
     const response = await instance.methods.buyItem(itemId, invoiceRef.id,numberOfItems).send({ from: buyer , value: priceInWei});
 
@@ -66,21 +66,40 @@ class ItemDetails extends Component {
   getItemPurchased(){
     const { firestore } = this.props;
     const itemId = this.props.match.params.id;
-    firestore.collection(`invoices`).where("itemId", "==",itemId).onSnapshot(snapshot => {
+    firestore.collection(`invoices`).where("itemId", "==",itemId).where("status","==",true).onSnapshot(snapshot => {
       const invoices = [];
       snapshot.docs.forEach((invoice)=>{
-        invoices.push(invoice.data())
+        invoices.push({...invoice.data(), id:invoice.id})
       })
-      console.log(invoices)
       this.setState({itemsPurchased:invoices})
     })
+  }
+
+  updateStatus= async (currentStatus, invoice)=>{
+    const {accounts, instance, name} = this.state;
+    let response;
+    if(currentStatus === 0){
+      response = await instance.methods.shipItem(invoice.id).send({ from: accounts[0] });
+    }
+    else if(currentStatus === 1){
+      response = await instance.methods.receiveItem(invoice.id).send({ from: accounts[0] });
+    }
+    else if(currentStatus === 2){
+      response = await instance.methods.refundItem(invoice.id).send({ from: accounts[0], value: invoice.amountPaid});
+    }
+    if(response.status){
+      const documentRef = this.props.firestore.doc(`invoices/${invoice.id}`);
+      await documentRef.update({state: state[currentStatus+1]})
+      this.getItemPurchased();
+      alert(`${name} status updated successfully!`)
+    }
   }
 
   render() {
     if(this.state.isLoading){
       return <Loader size="100px"/>
     }
-    const { itemId, name, price , image, seller, description, numberOfItems, itemsPurchased,itemsSold } = this.state
+    const { itemId, name, price , image, seller, description, numberOfItems, itemsPurchased } = this.state
     return <>
         <Card>
             <Heading.h4>{name}</Heading.h4>
@@ -110,7 +129,7 @@ class ItemDetails extends Component {
             <Heading.h6>Status: {itemPurchased.state}</Heading.h6>
             <Text>Number of Items purcahsed {itemPurchased.numberOfItems}</Text>
             <Text>You have purchased this item on {this.getDateTime(itemPurchased.timestamp)}</Text>
-            {itemPurchased.state === state[1] && this.isActionOwner(itemPurchased.buyer) && <Button onClick = {()=>this.updateStatus(itemPurchased.state,'',itemPurchased.index)}> Set as Received </Button>}
+            {itemPurchased.state === state[1] && this.isActionOwner(itemPurchased.buyer) && <Button onClick = {()=>this.updateStatus(1,itemPurchased)}> Set as Received </Button>}
           </div>
           )}
         </Card>
@@ -126,9 +145,9 @@ class ItemDetails extends Component {
               <Text>Number of Items Sold : {itemSold.numberOfItems}</Text>
               <Text>User have purchased this item on {this.getDateTime(itemSold.timestamp)}</Text>
               <Text> Buyer <EthAddress address={itemSold.buyer} truncate/></Text>
-              {parseInt(itemSold.status) === 0 && <Button onClick = {()=>this.updateStatus('Processing', itemSold.buyer, itemSold.index)}> Set as Shipped </Button>}
+              {itemSold.state === state[0] && <Button onClick = {()=>this.updateStatus(0, itemSold)}> Set as Shipped </Button>}
               <br/>
-              { parseInt(itemSold.status) < 3 && <Button onClick = {()=>this.updateStatus('Received', itemSold.buyer, itemSold.index)}> Refund </Button>}
+              { itemSold.state === state[2] && <Button onClick = {()=>this.updateStatus(2, itemSold)}> Refund </Button>}
             </div>
           )}
           
