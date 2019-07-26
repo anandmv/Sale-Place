@@ -54,7 +54,7 @@ const getInstance = async () =>{
         return { accounts, instance }
       } catch (error) {
         console.error(error);
-        throw error;
+        window.location.pathname="/metamask-required"
     }
 }
 

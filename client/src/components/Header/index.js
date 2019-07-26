@@ -4,13 +4,13 @@ import styled from 'styled-components';
 
 const HeaderWrapper = styled.div`
     overflow: hidden;
-    background-color: #f1f1f1;
+    background-color: #8BC34A;
     padding: 20px 10px;
   
   /* Style the header links */
   a {
     float: left;
-    color: black;
+    color: white;
     text-align: center;
     padding: 12px;
     text-decoration: none;
@@ -26,15 +26,10 @@ const HeaderWrapper = styled.div`
   }
   
   /* Change the background color on mouse-over */
-  a:hover {
-    background-color: #ddd;
-    color: black;
-  }
-  
-  /* Style the active/current link*/
-  a.active {
-    background-color: dodgerblue;
+  a:hover, a.active {
+    background-color: #8BC34A;
     color: white;
+    font-weight:bold;
   }
   
   /* Float the link section to the right */

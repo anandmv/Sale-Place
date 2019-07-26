@@ -65,5 +65,4 @@ node_modules/
 .env
 
 
-client/firebase*
-client/src/firebase*
+firebase*
