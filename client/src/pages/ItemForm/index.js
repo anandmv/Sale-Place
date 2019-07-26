@@ -19,9 +19,10 @@ class ItemForm extends Component {
   };
 
   componentDidMount = async () => {
-    const {accounts, instance} = await getInstance();
     const isEdit = !!this.props.match.params.id;
-    this.setState({ accounts, instance, isEdit, isLoading: isEdit }, this.getItem);
+    this.setState({isEdit, isLoading: isEdit})
+    const {accounts, instance} = await getInstance();
+    this.setState({ accounts, instance }, this.getItem);
   }
 
   getItem(){
