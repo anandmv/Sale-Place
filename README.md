@@ -1,4 +1,6 @@
-# Sale Place
+# Sale Place 
+[Live Demo](https://saleplace.web.app/)
+
 Ethereum based e-commerce app for sale
 A decentralized application running on Ethereum were a user can purchase/sell an item and track/update its status on the go.
 
