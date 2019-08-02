@@ -1,6 +1,10 @@
-# Sale Place
+# Sale Place 
+[Live Demo](https://saleplace.web.app/)
+
 Ethereum based e-commerce app for sale
 A decentralized application running on Ethereum were a user can purchase/sell an item and track/update its status on the go.
+
+[EtherScan Contract Deployed Address](https://rinkeby.etherscan.io/address/0xd823ff2600b5a0456c6a797b5cf1eaec2a32eb95)
 
 ## What's a SalePlace
 SalePlace is a e-commerce app , having only two kinds of user seller and a purchaser .Seller will be creating an item for sale and any user(purchaser) can pay for the item. Purchased item status will be updated by the seller and purchaser in the order of the action required from both ends.
