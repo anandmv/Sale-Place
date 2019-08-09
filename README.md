@@ -67,5 +67,7 @@ SalePlace is a e-commerce app , having only two kinds of user seller and a purch
     ```
     and then refresh the app page.Please confirm the network url from the truffle GUI/CLI 
     Once the app recognizes your MetaMask account you are good to go!
+    
+You will need to setup a firebase project and configure it [here](https://github.com/anandmv/Sale-Place/blob/master/client/src/firebase-config.js) before you start.
 
 This project is created out of React Truffle Box https://github.com/truffle-box/react-box
